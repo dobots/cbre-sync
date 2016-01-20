@@ -204,6 +204,33 @@ def checkCredentials():
 		sense_password = getpass.getpass()
 		print
 
+def checkForNewBeacons():
+	global sense_sensor_dict
+
+	beacons = getBeacons()
+	for b in beacons:
+		address = b['address']
+
+		if not sense_sensor_dict.has_key(address):
+			print "found new beacon [%s]" %address
+			sense_sensor_dict[address] = {'crownstoneSensorId': b['id']}
+
+			# using sys.stdout.write and .flush so that it's being written before waiting for getSensorId to complete
+			# if using print instead, line is only written after getSensorId completes
+			sys.stdout.write("checking last upload time ... ")
+			sys.stdout.flush()
+
+			if not getSensorId(address):
+				print "creating sensor ... ",
+				createSensor(address)
+				print "done, id: %s" %sense_sensor_dict[address]['senseSensorId']
+				sense_sensor_dict[address]['lastUploadTime'] = None
+			else:
+				sense_sensor_dict[address]['lastUploadTime'] = getLastUploadTime(address)
+				print sense_sensor_dict[address]['lastUploadTime']
+
+			print
+
 sense_sensor_dict = {}
 
 if __name__ == "__main__":
@@ -265,6 +292,9 @@ if __name__ == "__main__":
 		while True:
 			print "%s, starting iteration %s" %(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), iteration)
 			has_updates = False
+			update_count = 0
+
+			checkForNewBeacons()
 
 			for key, value in sense_sensor_dict.items():
 
@@ -277,9 +307,10 @@ if __name__ == "__main__":
 
 				if beacon['scans']:
 					has_updates = True
+					update_count += 1
 					print "found %s new scan(s): " %len(beacon['scans'])
 
-					pprint(beacon['scans'])
+					# pprint(beacon['scans'])
 
 					# using sys.stdout.write and .flush so that it's being written before waiting for uploadSensorData
 					# to complete
@@ -298,14 +329,16 @@ if __name__ == "__main__":
 			if not has_updates:
 				# write output on same line
 				sys.stdout.write('\r                                                '.format(iteration))
-				sys.stdout.write('\rno updates found\n'.format(iteration))
+				sys.stdout.write('\rno updates found\n')
 				sys.stdout.flush()
 			else:
 				# clear output on line
 				sys.stdout.write('\r                                                '.format(iteration))
 				sys.stdout.flush()
 
-			print
+			sys.stdout.write('\r{0}, iteration finished, {1} beacons updated\n\n'.format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), update_count))
+			sys.stdout.flush()
+			# print
 
 			iteration += 1
 
